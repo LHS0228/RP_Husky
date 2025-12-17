@@ -1,4 +1,5 @@
 using Ink.Runtime;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -18,10 +19,19 @@ public class DialogueManager : MonoBehaviour
     void Awake() { instance = this; }
 
     // 1. 대화 시작 (NPC가 호출)
-    public void StartDialogue(TextAsset inkJSON, Sprite portrait)
+    public void StartDialogue(TextAsset inkJSON, Sprite portrait, string npcName) // npcName 파라미터 추가 필요!
     {
-        currentStory = new Story(inkJSON.text); // Ink 엔진 로드
-        portraitImage.sprite = portrait; // 초상화 세팅
+        currentStory = new Story(inkJSON.text);
+        portraitImage.sprite = portrait;
+
+        // [추가] Ink에게 호감도 정보 알려주기
+        int currentScore = DataManager.instance.GetFriendship(npcName);
+
+        // Ink 파일 안에 'friendship'이라는 변수가 있다면 값 넣어주기
+        if (currentStory.variablesState.Contains("friendship"))
+        {
+            currentStory.variablesState["friendship"] = currentScore;
+        }
 
         dialoguePanel.SetActive(true);
         isDialoguePlaying = true;

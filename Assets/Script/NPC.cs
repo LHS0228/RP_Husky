@@ -10,7 +10,7 @@ public class NPC : EventObjectBase
         LookAtPlayer(player);
 
         //대화 매니저에 ink 넘겨주기 요청
-        DialogueManager.instance.StartDialogue(data.inkJSONAsset, data.portrait);
+        DialogueManager.instance.StartDialogue(data.inkJSONAsset, data.portrait, data.npcName);
     }
 
     void LookAtPlayer(GameObject player)
