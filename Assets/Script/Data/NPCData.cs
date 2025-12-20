@@ -1,5 +1,6 @@
 using UnityEngine;
 
+[CreateAssetMenu(fileName = "NpcData", menuName = "GameData/NPC")]
 public class NPCData : ScriptableObject
 {
     [Header("기본 정보")]

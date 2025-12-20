@@ -1,33 +1,51 @@
 using Ink.Runtime;
+using System.Collections; // Coroutine 사용을 위해 추가
 using System.Linq;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem; // PlayerInput 제어를 위해 추가
 using UnityEngine.UI;
 
 public class DialogueManager : MonoBehaviour
 {
-    public static DialogueManager instance; // 싱글톤
+    public static DialogueManager instance;
 
     [Header("UI 연결")]
-    public GameObject dialoguePanel; // 대화창 패널
-    public TextMeshProUGUI dialogueText; // 대사 텍스트
-    public Image portraitImage; // 초상화
+    public GameObject dialoguePanel;
+    public TextMeshProUGUI dialogueText;
+    public Image portraitImage;
 
-    private Story currentStory; // 현재 실행 중인 Ink 스토리 엔진
+    private Story currentStory;
     private bool isDialoguePlaying = false;
+    private float dialogueStartTime;
 
-    void Awake() { instance = this; }
+    // [추가 1] 플레이어의 입력을 제어하기 위한 변수
+    private PlayerInput playerInput;
 
-    // 1. 대화 시작 (NPC가 호출)
-    public void StartDialogue(TextAsset inkJSON, Sprite portrait, string npcName) // npcName 파라미터 추가 필요!
+    void Awake()
     {
+        instance = this;
+    }
+
+    void Start()
+    {
+        // 씬에 있는 PlayerInput 컴포넌트를 찾아서 기억해둠
+        playerInput = FindObjectOfType<PlayerInput>();
+    }
+
+    public void StartDialogue(TextAsset inkJSON, Sprite portrait, string npcName)
+    {
+        // [추가 2] 대화 시작하면 플레이어 움직임/상호작용 잠금!
+        if (playerInput != null)
+        {
+            playerInput.enabled = false;
+            // 주의: PlayerController가 아니라 PlayerInput을 꺼야 'OnInteract' 신호 자체가 차단됩니다.
+        }
+
         currentStory = new Story(inkJSON.text);
         portraitImage.sprite = portrait;
 
-        // [추가] Ink에게 호감도 정보 알려주기
         int currentScore = DataManager.instance.GetFriendship(npcName);
-
-        // Ink 파일 안에 'friendship'이라는 변수가 있다면 값 넣어주기
         if (currentStory.variablesState.Contains("friendship"))
         {
             currentStory.variablesState["friendship"] = currentScore;
@@ -35,37 +53,56 @@ public class DialogueManager : MonoBehaviour
 
         dialoguePanel.SetActive(true);
         isDialoguePlaying = true;
+        dialogueStartTime = Time.time;
 
         ContinueStory();
     }
 
-    // 2. 다음 줄 읽기 (클릭할 때마다 호출)
     public void ContinueStory()
     {
-        // 더 읽을 내용이 있으면
         if (currentStory.canContinue)
         {
-            // 한 줄 읽어서 UI에 뿌리기
             dialogueText.text = currentStory.Continue();
         }
-        // 내용이 끝났으면
         else
         {
             EndDialogue();
         }
     }
 
-    // 3. 대화 종료
     void EndDialogue()
     {
         isDialoguePlaying = false;
         dialoguePanel.SetActive(false);
+
+        // [추가 3] 바로 켜지 말고, 0.2초만 기다렸다가 켬 (F키 연타 방지)
+        StartCoroutine(EnablePlayerInputAfterDelay());
     }
 
-    // 화면 클릭 처리
+    // [추가 4] 쿨타임 코루틴
+    IEnumerator EnablePlayerInputAfterDelay()
+    {
+        // F키를 눌러서 대화창을 닫는 그 순간의 입력이
+        // PlayerController에게 전달되지 않도록 프레임을 뜀
+        yield return new WaitForSeconds(0.2f);
+
+        if (playerInput != null)
+        {
+            playerInput.enabled = true; // 이제 다시 움직이고 말 걸 수 있음
+        }
+    }
+
     void Update()
     {
-        if (isDialoguePlaying && Input.GetKeyDown(KeyCode.Space))
+        if (!isDialoguePlaying) return;
+
+        // 대화 시작 직후 쿨타임
+        if (Time.time - dialogueStartTime < 0.2f) return;
+
+        // 입력 받기
+        if ((Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame) ||
+            (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) ||
+            (Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame)) // F키
         {
             ContinueStory();
         }
